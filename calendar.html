@@ -220,7 +220,7 @@ function dayPanel() {
   var h = '<div class="panel"><div class="ph"><div class="pt ' + (d.getDay() === 0 || hn ? "sun" : d.getDay() === 6 ? "sat" : "") + '">' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + WD[d.getDay()] + '）' + (hn ? '<small>' + hn + '</small>' : '') + '</div></div>';
   if (!list.length) h += '<div class="empty">予定はないで</div>';
   list.forEach(function (e) {
-    h += '<div class="prow" data-a="edit" data-id="' + e.id + '"><div class="ptime">' + (e.allDay ? "終日" : esc(e.start || "") + (e.end ? '<br><span>' + esc(e.end) + '</span>' : "")) + '</div><div class="pbar" style="background:' + e.color + '"></div><div class="pbody"><div class="ptitle">' + esc(e.title || "（タイトルなし）") + '</div>' + (function () { var ps = []; if (e.repeat && e.repeat !== "none") ps.push(repText(e.repeat)); if (e.memo) ps.push(esc(e.memo.split("\n")[0])); return ps.length ? '<div class="psub">' + ps.join("・") + '</div>' : ""; })() + '</div></div>';
+    h += '<div class="prow" data-a="edit" data-id="' + e.id + '"><div class="ptime">' + (e.allDay ? "終日" : esc(e.start || "") + (e.end ? '<br><span>' + esc(e.end) + '</span>' : "")) + '</div><div class="pbar" style="background:' + e.color + '"></div><div class="pbody"><div class="ptitle">' + esc(e.title || "（タイトルなし）") + '</div>' + (function () { var ps = []; if (e.memo) ps.push(esc(e.memo.split("\n")[0])); return ps.length ? '<div class="psub">' + ps.join("・") + '</div>' : ""; })() + '</div></div>';
   });
   return h + '</div>';
 }
