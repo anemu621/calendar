@@ -195,7 +195,13 @@ function flash(kind, msg) {
 }
 
 /* ---------- 予定の展開 ---------- */
+function spanOf(ev) { return ev.endDate && ev.endDate > ev.date ? Math.round((parseD(ev.endDate) - parseD(ev.date)) / 86400000) : 0; }
 function occursOn(ev, d) {
+  var sp = spanOf(ev);
+  for (var k = 0; k <= sp; k++) { if (occursStart(ev, new Date(d.getFullYear(), d.getMonth(), d.getDate() - k))) return true; }
+  return false;
+}
+function occursStart(ev, d) {
   var ds = ymd(d); if (ds < ev.date) return false;
   if (ds === ev.date) return true;
   var b = parseD(ev.date);
@@ -220,7 +226,7 @@ function dayPanel() {
   var h = '<div class="panel"><div class="ph"><div class="pt ' + (d.getDay() === 0 || hn ? "sun" : d.getDay() === 6 ? "sat" : "") + '">' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + WD[d.getDay()] + '）' + (hn ? '<small>' + hn + '</small>' : '') + '</div></div>';
   if (!list.length) h += '<div class="empty">予定はないで</div>';
   list.forEach(function (e) {
-    h += '<div class="prow" data-a="edit" data-id="' + e.id + '"><div class="ptime">' + (e.allDay ? "終日" : esc(e.start || "") + (e.end ? '<br><span>' + esc(e.end) + '</span>' : "")) + '</div><div class="pbar" style="background:' + e.color + '"></div><div class="pbody"><div class="ptitle">' + esc(e.title || "（タイトルなし）") + '</div>' + (function () { var ps = []; if (e.memo) ps.push(esc(e.memo.split("\n")[0])); return ps.length ? '<div class="psub">' + ps.join("・") + '</div>' : ""; })() + '</div></div>';
+    h += '<div class="prow" data-a="edit" data-id="' + e.id + '"><div class="ptime">' + (e.allDay ? "終日" : esc(e.start || "") + (e.end ? '<br><span>' + esc(e.end) + '</span>' : "")) + '</div><div class="pbar" style="background:' + e.color + '"></div><div class="pbody"><div class="ptitle">' + esc(e.title || "（タイトルなし）") + '</div>' + (function () { var ps = []; if (spanOf(e)) { var s1 = parseD(e.date), s2 = parseD(e.endDate); ps.push((s1.getMonth() + 1) + "/" + s1.getDate() + "〜" + (s2.getMonth() + 1) + "/" + s2.getDate()); } if (e.memo) ps.push(esc(e.memo.split("\n")[0])); return ps.length ? '<div class="psub">' + ps.join("・") + '</div>' : ""; })() + '</div></div>';
   });
   return h + '</div>';
 }
@@ -228,7 +234,7 @@ function formHtml() {
   var f = state.form;
   var h = '<div class="overlay"><div class="modal"><div class="mh"><div class="mt">' + (f.id ? "予定を直す" : "予定を追加") + '</div><button class="x" data-a="close">✕</button></div>' +
     '<label class="fl" style="margin-top:4px">タイトル</label><input class="in" id="f-title" type="text" placeholder="例：ゴミの日、病院" value="' + esc(f.title) + '" />' +
-    '<label class="fl">日にち</label><input class="in" id="f-date" type="date" value="' + f.date + '" />' +
+    '<div class="two"><div><label class="fl">はじまりの日</label><input class="in" id="f-date" type="date" value="' + f.date + '" /></div><div><label class="fl">おわりの日</label><input class="in" id="f-edate" type="date" value="' + f.endDate + '" /></div></div>' +
     '<div class="switch"><span>終日</span><input type="checkbox" id="f-all"' + (f.allDay ? " checked" : "") + ' /></div>';
   if (!f.allDay) h += '<div class="two"><div><label class="fl">はじまり</label><input class="in" id="f-start" type="time" value="' + f.start + '" /></div><div><label class="fl">おわり</label><input class="in" id="f-end" type="time" value="' + f.end + '" /></div></div>';
   h += '<label class="fl">色</label><div class="colors">' + COLORS.map(function (c) { return '<button type="button" class="cwrap" data-a="color" data-c="' + c + '"><span class="cdot' + (f.color === c ? " on" : "") + '" style="background:' + c + '"></span><span class="cname">' + esc(state.cnames[c] || "") + '</span></button>'; }).join("") + '</div>' +
@@ -339,13 +345,17 @@ function shiftMonth(n) {
   var tn = new Date(); state.sel = (tn.getFullYear() === state.year && tn.getMonth() === state.month) ? ymd(tn) : ymd(new Date(state.year, state.month, 1));
   render();
 }
-function newForm(ds) { return { id: null, title: "", date: ds, allDay: false, start: "09:00", end: "10:00", color: COLORS[5], repeat: "none", memo: "", err: "" }; }
+function newForm(ds) { return { id: null, title: "", date: ds, endDate: ds, allDay: false, start: "09:00", end: "10:00", color: COLORS[5], repeat: "none", memo: "", err: "" }; }
 function closeAll() { state.form = null; state.rform = null; render(); }
 function readForm() {
   var f = state.form; if (!f) return;
   var g = function (id) { return document.getElementById(id); };
   if (g("f-title")) f.title = g("f-title").value;
+  var od = f.date;
   if (g("f-date") && g("f-date").value) f.date = g("f-date").value;
+  if (g("f-edate") && g("f-edate").value) f.endDate = g("f-edate").value;
+  if (f.date !== od && f.endDate === od) f.endDate = f.date;
+  if (!f.endDate || f.endDate < f.date) f.endDate = f.date;
   if (g("f-all")) f.allDay = g("f-all").checked;
   if (g("f-start")) f.start = g("f-start").value || f.start;
   if (g("f-end")) f.end = g("f-end").value || f.end;
@@ -408,7 +418,7 @@ app.addEventListener("click", function (e) {
   else if (a === "add") { state.form = newForm(el.getAttribute("data-d")); render(); }
   else if (a === "edit") {
     var ev = state.events.filter(function (x) { return x.id === el.getAttribute("data-id"); })[0]; if (!ev) return;
-    state.form = { id: ev.id, title: ev.title, date: ev.date, allDay: !!ev.allDay, start: ev.start || "09:00", end: ev.end || "10:00", color: ev.color, repeat: ev.repeat || "none", memo: ev.memo || "", err: "" };
+    state.form = { id: ev.id, title: ev.title, date: ev.date, endDate: ev.endDate || ev.date, allDay: !!ev.allDay, start: ev.start || "09:00", end: ev.end || "10:00", color: ev.color, repeat: ev.repeat || "none", memo: ev.memo || "", err: "" };
     render();
   }
   else if (a === "cname-edit") { readForm(); state.form.editNames = !state.form.editNames; render(); }
@@ -416,8 +426,8 @@ app.addEventListener("click", function (e) {
   else if (a === "save-ev") {
     readForm(); var f = state.form;
     if (!f.title.trim()) { f.err = "タイトルを入れてな"; render(); return; }
-    if (!f.allDay && f.end && f.start && f.end < f.start) { f.err = "おわりの時間が、はじまりより前になってるで"; render(); return; }
-    var rec = { id: f.id || uid(), title: f.title.trim(), date: f.date, allDay: f.allDay, start: f.allDay ? "" : f.start, end: f.allDay ? "" : f.end, color: f.color, repeat: f.repeat, memo: f.memo };
+    if (!f.allDay && f.endDate === f.date && f.end && f.start && f.end < f.start) { f.err = "おわりの時間が、はじまりより前になってるで"; render(); return; }
+    var rec = { id: f.id || uid(), title: f.title.trim(), date: f.date, endDate: f.endDate > f.date ? f.endDate : "", allDay: f.allDay, start: f.allDay ? "" : f.start, end: f.allDay ? "" : f.end, color: f.color, repeat: f.repeat, memo: f.memo };
     var idx = -1; state.events.forEach(function (x, i) { if (x.id === rec.id) idx = i; });
     if (idx >= 0) state.events[idx] = rec; else state.events.push(rec);
     var d = parseD(rec.date); state.year = d.getFullYear(); state.month = d.getMonth();
