@@ -272,7 +272,7 @@ function dayRoutineHtml() {
   list.forEach(function (x, i) {
     var endM = x.end ? toMin(x.end) : (list[i + 1] ? toMin(list[i + 1].start) : 24 * 60);
     var cur = isToday && toMin(x.start) <= nowM && nowM < endM && !done[x.id];
-    h += '<div class="rrow' + (done[x.id] ? " done" : "") + (cur ? " cur" : "") + '"><div class="ptime">' + esc(x.start) + (x.end ? '<br><span>' + esc(x.end) + '</span>' : "") + '</div><div class="pbar" style="background:' + (x.color || "#e8729a") + '"></div><div class="pbody" data-a="redit" data-id="' + x.id + '"><div class="ptitle">' + esc(x.title) + '</div>' + (cur ? '<div class="psub nowtag">いま</div>' : "") + '</div><button class="chk" data-a="rtoggle" data-id="' + x.id + '">' + (done[x.id] ? "✓" : "") + '</button></div>';
+    h += '<div class="rrow' + (done[x.id] ? " done" : "") + '"><div class="ptime">' + esc(x.start) + (x.end ? '<br><span>' + esc(x.end) + '</span>' : "") + '</div><div class="pbar" style="background:' + (x.color || "#e8729a") + '"></div><div class="pbody" data-a="redit" data-id="' + x.id + '"><div class="ptitle">' + esc(x.title) + '</div>' + "" + '</div><button class="chk" data-a="rtoggle" data-id="' + x.id + '">' + (done[x.id] ? "✓" : "") + '</button></div>';
   });
   return h + '</div><div class="footer-tools"><button class="tool-btn" data-a="export">バックアップを書き出す</button><button class="tool-btn" data-a="import">読み込む</button></div></div><button class="fab" data-a="radd">＋</button>';
 }
