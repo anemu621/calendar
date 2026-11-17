@@ -315,7 +315,7 @@ function renderApp() {
   if (state.notice) h += '<div class="banner ok">' + esc(state.notice) + '</div>';
   if (isDay) return h + '</div>' + dayRoutineHtml() + renderModal();
   if (!isCal) return h + '</div>' + todoHtml();
-  h += '<div class="cal" id="cal"><div class="dow">' + WD.map(function (w, i) { return '<div class="' + (i === 0 ? "sun" : i === 6 ? "sat" : "") + '">' + w + '</div>'; }).join("") + '</div><div class="grid">';
+  h += '</div><div class="scroll-area" id="sarea"><div class="cal" id="cal"><div class="dow">' + WD.map(function (w, i) { return '<div class="' + (i === 0 ? "sun" : i === 6 ? "sat" : "") + '">' + w + '</div>'; }).join("") + '</div><div class="grid">';
   for (var i = 0; i < rows * 7; i++) {
     var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i), ds = ymd(d), hn = holiday(d), evs = eventsOn(d);
     var cls = "day" + (d.getMonth() !== m ? " out" : "") + (d.getDay() === 0 ? " sun" : d.getDay() === 6 ? " sat" : "") + (hn ? " hol" : "") + (ds === today ? " today" : "") + (ds === state.sel ? " sel" : "");
@@ -324,13 +324,15 @@ function renderApp() {
     if (evs.length > (hn ? 2 : 3)) h += '<div class="more">他' + (evs.length - (hn ? 2 : 3)) + '件</div>';
     h += '</button>';
   }
-  h += '</div></div></div><div class="scroll-area">' + dayPanel() + '<div class="footer-tools"><button class="tool-btn" data-a="export">バックアップを書き出す</button><button class="tool-btn" data-a="import">読み込む</button></div></div><button class="fab" data-a="add" data-d="' + state.sel + '">＋</button>';
+  h += '</div></div>' + dayPanel() + '<div class="footer-tools"><button class="tool-btn" data-a="export">バックアップを書き出す</button><button class="tool-btn" data-a="import">読み込む</button></div></div><button class="fab" data-a="add" data-d="' + state.sel + '">＋</button>';
   return h + renderModal();
 }
 var ICON_SRC = (function () { try { return document.querySelector('link[rel="icon"]').getAttribute("href"); } catch (e) { return ""; } })();
 function render() {
   var sc = document.querySelector(".modal"), keep = sc ? sc.scrollTop : 0;
+  var sa = document.getElementById("sarea"), keepS = sa ? sa.scrollTop : 0;
   document.getElementById("app").innerHTML = renderApp();
+  var sa2 = document.getElementById("sarea"); if (sa2) sa2.scrollTop = keepS;
   var mo = document.querySelector(".modal"); if (mo) mo.scrollTop = keep;
   syncOverlay();
 }
@@ -416,7 +418,7 @@ app.addEventListener("click", function (e) {
     state.rform = null; save(); render();
   }
   else if (a === "today") { var n = new Date(); state.year = n.getFullYear(); state.month = n.getMonth(); state.sel = todayStr(); render(); }
-  else if (a === "day") { var sd = el.getAttribute("data-d"), dd = parseD(sd); state.sel = sd; state.form = null; if (dd.getMonth() !== state.month) { state.year = dd.getFullYear(); state.month = dd.getMonth(); } render(); }
+  else if (a === "day") { var sd = el.getAttribute("data-d"), dd = parseD(sd); state.sel = sd; state.form = null; if (dd.getMonth() !== state.month) { state.year = dd.getFullYear(); state.month = dd.getMonth(); } render(); var sa3 = document.getElementById("sarea"), pn = document.querySelector(".panel"); if (sa3 && pn) { try { sa3.scrollTo({ top: pn.offsetTop - 8, behavior: "smooth" }); } catch (e) { sa3.scrollTop = pn.offsetTop - 8; } } }
   else if (a === "close") closeAll();
   else if (a === "add") { state.form = newForm(el.getAttribute("data-d")); render(); }
   else if (a === "edit") {
