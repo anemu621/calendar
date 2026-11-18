@@ -66,6 +66,8 @@ button { font-family: inherit; cursor: pointer; }
 .tx { border: none; background: transparent; color: #b4c6d4; font-size: 16px; font-weight: 800; padding: 6px 8px; }
 .dtitle { font-size: 12px; font-weight: 800; color: var(--sub); margin: 16px 0 2px; }
 .rprog { font-size: 14px; font-weight: 700; color: var(--sub); margin-bottom: 8px; } .rprog b { font-size: 20px; color: var(--ink); }
+.sortbtn { float: right; border: 1px solid var(--line); background: #fff; color: var(--accent-d); font-weight: 800; font-size: 12px; padding: 5px 12px; border-radius: 999px; } .sortbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.mv { display: flex; gap: 6px; flex: 0 0 auto; } .mv button { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--accent-d); font-size: 16px; } .mv button:disabled { opacity: .3; }
 .rbar { height: 8px; background: #f0f0f0; border-radius: 999px; overflow: hidden; margin-bottom: 6px; } .rbar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .2s; }
 .rrow { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
 .rrow .pbody { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
@@ -122,7 +124,7 @@ var COLORS = ["#e8504f", "#f58ab4", "#ffd21f", "#8fc23a", "#3fae6a", "#4a9fe0", 
 var COLOR_MIGRATE = { "#ef6f8f": "#e8504f", "#f2913a": "#ffd21f", "#d6a300": "#8fc23a", "#4fb286": "#3fae6a", "#e6b400": "#ffd21f" };
 function evText(c) { return c === "#ffd21f" ? "#4a3b00" : "#fff"; }
 var __n = new Date();
-var state = { events: [], todos: [], cnames: {}, routine: [], rdone: {}, rdate: ymd(__n), rform: null, tab: "cal", year: __n.getFullYear(), month: __n.getMonth(), sel: ymd(__n), form: null, notice: "", error: "" };
+var state = { events: [], todos: [], cnames: {}, routine: [], rdone: {}, rdate: ymd(__n), rform: null, rsort: false, tab: "cal", year: __n.getFullYear(), month: __n.getMonth(), sel: ymd(__n), form: null, notice: "", error: "" };
 
 function pad(n) { return (n < 10 ? "0" : "") + n; }
 function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
@@ -169,17 +171,18 @@ function holidaysOf(y) {
 function holiday(d) { return holidaysOf(d.getFullYear())[ymd(d)] || ""; }
 
 /* ---------- 保存 ---------- */
-function payload() { return { events: state.events, todos: state.todos, cnames: state.cnames, routine: state.routine, rdone: state.rdone }; }
+function payload() { return { events: state.events, todos: state.todos, cnames: state.cnames, routine: state.routine, rdone: state.rdone, rord: 1 }; }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(payload())); return true; }
   catch (e) { flash("error", "保存に失敗しました。バックアップを書き出してな。"); return false; }
 }
+function sortByTime(a) { return a.map(function (x, i) { return [x, i]; }).sort(function (p, q) { var ka = p[0].start || "99:99", kb = q[0].start || "99:99"; return ka < kb ? -1 : ka > kb ? 1 : p[1] - q[1]; }).map(function (z) { return z[0]; }); }
 function load() {
   try {
     var d = JSON.parse(localStorage.getItem(KEY) || "null");
     if (d && Array.isArray(d.events)) state.events = d.events;
     if (d && Array.isArray(d.todos)) state.todos = d.todos;
-    if (d && Array.isArray(d.routine)) state.routine = d.routine;
+    if (d && Array.isArray(d.routine)) { state.routine = d.routine; if (!d.rord) state.routine = sortByTime(state.routine); }
     if (d && d.rdone && typeof d.rdone === "object") state.rdone = d.rdone;
     if (d && d.cnames && typeof d.cnames === "object") state.cnames = d.cnames;
   } catch (e) {}
@@ -269,19 +272,19 @@ function todoHtml() {
 }
 function rItemsOn(ds) {
   var wd = parseD(ds).getDay();
-  return state.routine.filter(function (x) { return x.date ? x.date === ds : (!x.days || x.days.indexOf(wd) >= 0); }).sort(function (a, b) { var ka = a.start || "99:99", kb = b.start || "99:99"; return ka < kb ? -1 : ka > kb ? 1 : 0; });
+  return state.routine.filter(function (x) { return x.date ? x.date === ds : (!x.days || x.days.indexOf(wd) >= 0); });
 }
 function toMin(s) { var p = (s || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); }
 function dayRoutineHtml() {
   var ds = state.rdate, list = rItemsOn(ds), done = state.rdone[ds] || {}, nd = 0;
   list.forEach(function (x) { if (done[x.id]) nd++; });
   var isToday = ds === todayStr(), now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
-  var h = '<div class="scroll-area" id="rarea"><div class="panel"><div class="rprog"><b>' + nd + ' / ' + list.length + '</b> できた</div><div class="rbar"><i style="width:' + (list.length ? Math.round(nd / list.length * 100) : 0) + '%"></i></div>';
+  var h = '<div class="scroll-area" id="rarea"><div class="panel"><div class="rprog"><b>' + nd + ' / ' + list.length + '</b> できた' + (list.length > 1 ? '<button class="sortbtn' + (state.rsort ? " on" : "") + '" data-a="rsort">' + (state.rsort ? "完了" : "並べ替え") + '</button>' : "") + '</div><div class="rbar"><i style="width:' + (list.length ? Math.round(nd / list.length * 100) : 0) + '%"></i></div>';
   if (!list.length) h += '<div class="empty">この日の予定はまだないで。<br>右下の「＋」で入れてな。</div>';
   list.forEach(function (x, i) {
     var nx = list[i + 1], endM = x.end ? toMin(x.end) : (nx && nx.start ? toMin(nx.start) : 24 * 60);
     var cur = isToday && x.start && toMin(x.start) <= nowM && nowM < endM && !done[x.id];
-    h += '<div class="rrow' + (done[x.id] ? " done" : "") + '"><div class="ptime">' + (x.start ? esc(x.start) : '<span style="font-size:10px;white-space:nowrap;color:#9aa0a2">時間なし</span>') + (x.end ? '<br><span>' + esc(x.end) + '</span>' : "") + '</div><div class="pbar" style="background:' + (x.color || "#e8729a") + '"></div><div class="pbody" data-a="redit" data-id="' + x.id + '"><div class="ptitle"' + (x.tc ? ' style="color:' + x.tc + '"' : "") + '>' + esc(x.title) + '</div>' + "" + '</div><button class="chk" data-a="rtoggle" data-id="' + x.id + '">' + (done[x.id] ? "✓" : "") + '</button></div>';
+    h += '<div class="rrow' + (done[x.id] ? " done" : "") + '"><div class="ptime">' + (x.start ? esc(x.start) : '<span style="font-size:10px;white-space:nowrap;color:#9aa0a2">時間なし</span>') + (x.end ? '<br><span>' + esc(x.end) + '</span>' : "") + '</div><div class="pbar" style="background:' + (x.color || "#e8729a") + '"></div><div class="pbody"' + (state.rsort ? "" : ' data-a="redit" data-id="' + x.id + '"') + '><div class="ptitle"' + (x.tc ? ' style="color:' + x.tc + '"' : "") + '>' + esc(x.title) + '</div>' + "" + '</div>' + (state.rsort ? '<div class="mv"><button data-a="rmove" data-id="' + x.id + '" data-dir="-1"' + (i === 0 ? " disabled" : "") + '>▲</button><button data-a="rmove" data-id="' + x.id + '" data-dir="1"' + (i === list.length - 1 ? " disabled" : "") + '>▼</button></div>' : '<button class="chk" data-a="rtoggle" data-id="' + x.id + '">' + (done[x.id] ? "✓" : "") + '</button>') + '</div>';
   });
   return h + '</div><div class="footer-tools"><button class="tool-btn" data-a="export">バックアップを書き出す</button><button class="tool-btn" data-a="import">読み込む</button></div></div><button class="fab" data-a="radd">＋</button>';
 }
@@ -401,6 +404,13 @@ app.addEventListener("click", function (e) {
   else if (a === "rcolor") { readR(); state.rform.color = el.getAttribute("data-c"); render(); }
   else if (a === "rday") { readR(); var w = +el.getAttribute("data-w"), di = state.rform.days.indexOf(w); if (di >= 0) state.rform.days.splice(di, 1); else state.rform.days.push(w); render(); }
   else if (a === "rclear") { readR(); state.rform.start = ""; state.rform.end = ""; render(); }
+  else if (a === "rsort") { state.rsort = !state.rsort; render(); }
+  else if (a === "rmove") {
+    var mid = el.getAttribute("data-id"), dir = +el.getAttribute("data-dir"), ml = rItemsOn(state.rdate), mi = -1;
+    ml.forEach(function (x, i) { if (x.id === mid) mi = i; });
+    var ot = ml[mi + dir];
+    if (mi >= 0 && ot) { var ia = state.routine.indexOf(ml[mi]), ib = state.routine.indexOf(ot), tmp = state.routine[ia]; state.routine[ia] = state.routine[ib]; state.routine[ib] = tmp; save(); render(); }
+  }
   else if (a === "rall") { readR(); state.rform.days = [0, 1, 2, 3, 4, 5, 6]; render(); }
   else if (a === "rtoggle") { var rid = el.getAttribute("data-id"), dm = state.rdone[state.rdate] || (state.rdone[state.rdate] = {}); if (dm[rid]) delete dm[rid]; else dm[rid] = true; save(); render(); }
   else if (a === "rsave") {
@@ -411,7 +421,11 @@ app.addEventListener("click", function (e) {
     var rr = { id: rf.id || uid(), title: rf.title.trim(), start: rf.start, end: rf.end, color: rf.color || "#e8729a", tc: rf.tc || "" };
     if (rf.date) rr.date = rf.date; else rr.days = rf.days || [0, 1, 2, 3, 4, 5, 6];
     var ridx = -1; state.routine.forEach(function (x, i) { if (x.id === rr.id) ridx = i; });
-    if (ridx >= 0) state.routine[ridx] = rr; else state.routine.push(rr);
+    if (ridx >= 0) state.routine[ridx] = rr; else {
+      var cand = rr.date ? rItemsOn(rr.date) : state.routine.filter(function (x) { return !x.date; }), pos = -1;
+      if (rr.start) { for (var ci = 0; ci < cand.length; ci++) { if (!cand[ci].start || cand[ci].start > rr.start) { pos = state.routine.indexOf(cand[ci]); break; } } }
+      if (pos >= 0) state.routine.splice(pos, 0, rr); else state.routine.push(rr);
+    }
     state.rform = null; if (save()) render();
   }
   else if (a === "rdel") {
