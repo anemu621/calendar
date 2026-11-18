@@ -269,7 +269,7 @@ function todoHtml() {
 }
 function rItemsOn(ds) {
   var wd = parseD(ds).getDay();
-  return state.routine.filter(function (x) { return x.date ? x.date === ds : (!x.days || x.days.indexOf(wd) >= 0); }).sort(function (a, b) { return a.start < b.start ? -1 : a.start > b.start ? 1 : 0; });
+  return state.routine.filter(function (x) { return x.date ? x.date === ds : (!x.days || x.days.indexOf(wd) >= 0); }).sort(function (a, b) { var ka = a.start || "99:99", kb = b.start || "99:99"; return ka < kb ? -1 : ka > kb ? 1 : 0; });
 }
 function toMin(s) { var p = (s || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); }
 function dayRoutineHtml() {
@@ -279,9 +279,9 @@ function dayRoutineHtml() {
   var h = '<div class="scroll-area" id="rarea"><div class="panel"><div class="rprog"><b>' + nd + ' / ' + list.length + '</b> できた</div><div class="rbar"><i style="width:' + (list.length ? Math.round(nd / list.length * 100) : 0) + '%"></i></div>';
   if (!list.length) h += '<div class="empty">この日の予定はまだないで。<br>右下の「＋」で入れてな。</div>';
   list.forEach(function (x, i) {
-    var endM = x.end ? toMin(x.end) : (list[i + 1] ? toMin(list[i + 1].start) : 24 * 60);
-    var cur = isToday && toMin(x.start) <= nowM && nowM < endM && !done[x.id];
-    h += '<div class="rrow' + (done[x.id] ? " done" : "") + '"><div class="ptime">' + esc(x.start) + (x.end ? '<br><span>' + esc(x.end) + '</span>' : "") + '</div><div class="pbar" style="background:' + (x.color || "#e8729a") + '"></div><div class="pbody" data-a="redit" data-id="' + x.id + '"><div class="ptitle">' + esc(x.title) + '</div>' + "" + '</div><button class="chk" data-a="rtoggle" data-id="' + x.id + '">' + (done[x.id] ? "✓" : "") + '</button></div>';
+    var nx = list[i + 1], endM = x.end ? toMin(x.end) : (nx && nx.start ? toMin(nx.start) : 24 * 60);
+    var cur = isToday && x.start && toMin(x.start) <= nowM && nowM < endM && !done[x.id];
+    h += '<div class="rrow' + (done[x.id] ? " done" : "") + '"><div class="ptime">' + (x.start ? esc(x.start) : '<span style="font-size:10px;white-space:nowrap;color:#9aa0a2">時間なし</span>') + (x.end ? '<br><span>' + esc(x.end) + '</span>' : "") + '</div><div class="pbar" style="background:' + (x.color || "#e8729a") + '"></div><div class="pbody" data-a="redit" data-id="' + x.id + '"><div class="ptitle">' + esc(x.title) + '</div>' + "" + '</div><button class="chk" data-a="rtoggle" data-id="' + x.id + '">' + (done[x.id] ? "✓" : "") + '</button></div>';
   });
   return h + '</div><div class="footer-tools"><button class="tool-btn" data-a="export">バックアップを書き出す</button><button class="tool-btn" data-a="import">読み込む</button></div></div><button class="fab" data-a="radd">＋</button>';
 }
@@ -289,7 +289,7 @@ function rformHtml() {
   var f = state.rform, WDN = WD;
   return '<div class="overlay"><div class="modal"><div class="mh"><div class="mt">' + (f.id ? "予定を直す" : "予定を追加") + '</div><button class="x" data-a="close">✕</button></div>' +
     '<label class="fl" style="margin-top:4px">やること</label><input class="in" id="r-title" type="text" placeholder="例：朝ごはん、洗濯" value="' + esc(f.title) + '" />' +
-    '<div class="two"><div><label class="fl">はじまり</label><input class="in" id="r-start" type="time" value="' + f.start + '" /></div><div><label class="fl">おわり（なくてもええで）</label><input class="in" id="r-end" type="time" value="' + f.end + '" /></div></div>' +
+    '<div class="two"><div><label class="fl">はじまり（なくてもええで）</label><input class="in" id="r-start" type="time" value="' + f.start + '" /></div><div><label class="fl">おわり（なくてもええで）</label><input class="in" id="r-end" type="time" value="' + f.end + '" /></div></div><button class="tool-btn" data-a="rclear" style="margin-top:8px;width:100%">時間なしにする</button>' +
     (f.err ? '<div class="err">' + esc(f.err) + '</div>' : "") +
     '<button class="primary" data-a="rsave">' + (f.id ? "保存する" : "追加する") + '</button>' +
     (f.id ? '<button class="del" data-a="rdel">この予定を削除</button>' + (f.date ? "" : '<div class="note">毎日くり返す予定やから、削除すると全部の日からなくなるで。</div>') : "") + '</div></div>';
@@ -298,7 +298,7 @@ function readR() {
   var f = state.rform; if (!f) return;
   var g = function (id) { return document.getElementById(id); };
   if (g("r-title")) f.title = g("r-title").value;
-  if (g("r-start") && g("r-start").value) f.start = g("r-start").value;
+  if (g("r-start")) f.start = g("r-start").value;
   if (g("r-end")) f.end = g("r-end").value;
 }
 function shiftDay(n) { var d = parseD(state.rdate); d.setDate(d.getDate() + n); state.rdate = ymd(d); render(); }
@@ -394,16 +394,17 @@ app.addEventListener("click", function (e) {
   else if (a === "today" && state.tab === "day") { state.rdate = todayStr(); render(); }
   else if (a === "rprev") shiftDay(-1)
   else if (a === "rnext") shiftDay(1)
-  else if (a === "radd") { state.rform = { id: null, title: "", start: "07:00", end: "", date: state.rdate, err: "" }; render(); }
+  else if (a === "radd") { state.rform = { id: null, title: "", start: "", end: "", date: state.rdate, err: "" }; render(); }
   else if (a === "redit") { var ri = state.routine.filter(function (x) { return x.id === el.getAttribute("data-id"); })[0]; if (ri) { state.rform = { id: ri.id, title: ri.title, start: ri.start, end: ri.end || "", color: ri.color, date: ri.date || "", days: ri.days ? ri.days.slice() : null, err: "" }; render(); } }
   else if (a === "rcolor") { readR(); state.rform.color = el.getAttribute("data-c"); render(); }
   else if (a === "rday") { readR(); var w = +el.getAttribute("data-w"), di = state.rform.days.indexOf(w); if (di >= 0) state.rform.days.splice(di, 1); else state.rform.days.push(w); render(); }
+  else if (a === "rclear") { readR(); state.rform.start = ""; state.rform.end = ""; render(); }
   else if (a === "rall") { readR(); state.rform.days = [0, 1, 2, 3, 4, 5, 6]; render(); }
   else if (a === "rtoggle") { var rid = el.getAttribute("data-id"), dm = state.rdone[state.rdate] || (state.rdone[state.rdate] = {}); if (dm[rid]) delete dm[rid]; else dm[rid] = true; save(); render(); }
   else if (a === "rsave") {
     readR(); var rf = state.rform;
     if (!rf.title.trim()) { rf.err = "やることを入れてな"; render(); return; }
-    if (!rf.start) { rf.err = "はじまりの時間を入れてな"; render(); return; }
+    if (!rf.start) rf.end = "";
     if (rf.end && rf.end < rf.start) { rf.err = "おわりの時間が、はじまりより前になってるで"; render(); return; }
     var rr = { id: rf.id || uid(), title: rf.title.trim(), start: rf.start, end: rf.end, color: rf.color || "#e8729a" };
     if (rf.date) rr.date = rf.date; else rr.days = rf.days || [0, 1, 2, 3, 4, 5, 6];
