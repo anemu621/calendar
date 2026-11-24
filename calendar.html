@@ -35,15 +35,19 @@ button { font-family: inherit; cursor: pointer; }
 .cal { padding: 10px 6px 0; }
 .dow { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; font-weight: 700; color: var(--sub); padding-bottom: 6px; }
 .dow .sun { color: var(--sun); } .dow .sat { color: var(--sat); }
-.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.grid { display: flex; flex-direction: column; gap: 3px; }
+.week { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.span { position: absolute; height: 15px; font-size: 9.5px; font-weight: 700; line-height: 15px; padding: 0 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; z-index: 2; }
+.span.lc { border-top-left-radius: 0; border-bottom-left-radius: 0; } .span.rc { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.sp { height: 15px; flex: 0 0 auto; }
 .day { min-height: 62px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 3px 2px 3px; text-align: left; color: var(--ink); display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 .day.out { background: #f8f8f8; opacity: .55; }
-.day .dn { font-size: 13px; font-weight: 800; line-height: 1; padding: 2px 0 0 3px; display: flex; align-items: center; gap: 3px; min-height: 20px; }
+.day .dn { font-size: 13px; font-weight: 800; line-height: 1; padding: 0 0 0 3px; display: flex; align-items: center; gap: 3px; height: 20px; flex: 0 0 auto; }
 .day .dn .num { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 50%; }
 .day.sun .num, .day.hol .num { color: var(--sun); } .day.sat .num { color: var(--sat); }
 .day.today .num { background: var(--accent); color: #fff; }
-.day .hn { font-size: 8px; font-weight: 700; color: var(--sun); line-height: 1.1; padding: 0 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ev { font-size: 9.5px; font-weight: 700; color: #fff; border-radius: 4px; padding: 1.5px 3px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day .hn { height: 10px; flex: 0 0 auto; font-size: 8px; font-weight: 700; color: var(--sun); line-height: 1.1; padding: 0 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev { font-size: 9.5px; font-weight: 700; color: #fff; border-radius: 4px; padding: 0 3px; height: 15px; line-height: 15px; flex: 0 0 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .more { font-size: 9.5px; color: var(--sub); font-weight: 700; padding-left: 3px; }
 .day.sel { border: 2px solid var(--accent); background: #fafafa; }
 .panel { margin: 12px 6px 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 6px; }
@@ -321,16 +325,63 @@ function renderApp() {
   if (isDay) return h + '</div>' + dayRoutineHtml() + renderModal();
   if (!isCal) return h + '</div>' + todoHtml();
   h += '</div><div class="scroll-area" id="sarea"><div class="cal" id="cal"><div class="dow">' + WD.map(function (w, i) { return '<div class="' + (i === 0 ? "sun" : i === 6 ? "sat" : "") + '">' + w + '</div>'; }).join("") + '</div><div class="grid">';
-  for (var i = 0; i < rows * 7; i++) {
-    var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i), ds = ymd(d), hn = holiday(d), evs = eventsOn(d);
-    var cls = "day" + (d.getMonth() !== m ? " out" : "") + (d.getDay() === 0 ? " sun" : d.getDay() === 6 ? " sat" : "") + (hn ? " hol" : "") + (ds === today ? " today" : "") + (ds === state.sel ? " sel" : "");
-    h += '<button class="' + cls + '" data-a="day" data-d="' + ds + '"><div class="dn"><span class="num">' + d.getDate() + '</span></div>' + (hn ? '<div class="hn">' + hn + '</div>' : "");
-    evs.slice(0, hn ? 2 : 3).forEach(function (e) { h += '<div class="ev" style="background:' + e.color + ';color:' + evText(e.color) + '">' + esc(e.title || "予定") + '</div>'; });
-    if (evs.length > (hn ? 2 : 3)) h += '<div class="more">他' + (evs.length - (hn ? 2 : 3)) + '件</div>';
-    h += '</button>';
-  }
+  for (var wk = 0; wk < rows; wk++) { h += weekHtml(new Date(start.getFullYear(), start.getMonth(), start.getDate() + wk * 7), m, today); }
   h += '</div></div>' + dayPanel() + '<div class="footer-tools"><button class="tool-btn" data-a="export">バックアップを書き出す</button><button class="tool-btn" data-a="import">読み込む</button></div></div><button class="fab" data-a="add" data-d="' + state.sel + '">＋</button>';
   return h + renderModal();
+}
+
+/* ---------- 週ごとの描画（日にちをまたぐ予定は帯で表示） ---------- */
+function weekHtml(w0, m, today) {
+  var days = [], hasHol = false, c, i;
+  for (c = 0; c < 7; c++) { var dd = new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() + c), hh = holiday(dd); if (hh) hasHol = true; days.push({ d: dd, ds: ymd(dd), hn: hh }); }
+  var maxS = hasHol ? 2 : 3, segs = [];
+  state.events.forEach(function (e) {
+    var sp = spanOf(e);
+    for (c = 0; c < 7; c++) {
+      if (occursStart(e, days[c].d)) segs.push({ e: e, c: c, len: Math.min(sp + 1, 7 - c), sp: sp, lc: false, rc: sp + 1 > 7 - c });
+    }
+    if (sp > 0 && !occursStart(e, days[0].d) && occursOn(e, days[0].d)) {
+      for (var k = 1; k <= sp; k++) {
+        if (occursStart(e, new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() - k))) { var rem = sp - k + 1; segs.push({ e: e, c: 0, len: Math.min(rem, 7), sp: sp, lc: true, rc: rem > 7 }); break; }
+      }
+    }
+  });
+  function ord(a, b) {
+    var aw = a.sp > 0 ? 0 : 1, bw = b.sp > 0 ? 0 : 1; if (aw !== bw) return aw - bw;
+    if (aw === 0) return ((b.lc ? 1 : 0) - (a.lc ? 1 : 0)) || (b.len - a.len) || (a.c - b.c);
+    if (a.c !== b.c) return a.c - b.c;
+    if (a.e.allDay !== b.e.allDay) return a.e.allDay ? -1 : 1;
+    return (a.e.start || "") < (b.e.start || "") ? -1 : (a.e.start || "") > (b.e.start || "") ? 1 : 0;
+  }
+  segs.sort(ord);
+  var occ = [];
+  segs.forEach(function (s) {
+    var sl = 0;
+    for (;;) { var ok = true; for (c = s.c; c < s.c + s.len; c++) { if (occ[sl] && occ[sl][c]) { ok = false; break; } } if (ok) break; sl++; }
+    s.slot = sl; occ[sl] = occ[sl] || []; for (c = s.c; c < s.c + s.len; c++) occ[sl][c] = s;
+  });
+  var used = 0; segs.forEach(function (s) { if (s.slot < maxS && s.slot + 1 > used) used = s.slot + 1; });
+  var hd = hasHol ? 38 : 26, out = '<div class="week" style="--hd:' + hd + 'px">';
+  for (c = 0; c < 7; c++) {
+    var day = days[c], d = day.d, hn = day.hn, hid = 0;
+    var cls = "day" + (d.getMonth() !== m ? " out" : "") + (d.getDay() === 0 ? " sun" : d.getDay() === 6 ? " sat" : "") + (hn ? " hol" : "") + (day.ds === today ? " today" : "") + (day.ds === state.sel ? " sel" : "");
+    out += '<button class="' + cls + '" data-a="day" data-d="' + day.ds + '"><div class="dn"><span class="num">' + d.getDate() + '</span></div>' + (hasHol ? '<div class="hn">' + (hn || "") + '</div>' : "");
+    for (var s = 0; s < maxS; s++) {
+      var sg = occ[s] && occ[s][c];
+      if (s >= used) break;
+      if (!sg) out += '<div class="sp"></div>';
+      else if (sg.sp > 0) out += '<div class="sp"></div>';
+      else out += '<div class="ev" style="background:' + sg.e.color + ';color:' + evText(sg.e.color) + '">' + esc(sg.e.title || "予定") + '</div>';
+    }
+    for (var s2 = maxS; s2 < occ.length; s2++) { if (occ[s2] && occ[s2][c]) hid++; }
+    if (hid) out += '<div class="more">他' + hid + '件</div>';
+    out += '</button>';
+  }
+  segs.forEach(function (s) {
+    if (s.sp === 0 || s.slot >= maxS) return;
+    out += '<div class="span' + (s.lc ? " lc" : "") + (s.rc ? " rc" : "") + '" style="background:' + s.e.color + ';color:' + evText(s.e.color) + ';top:' + (hd + s.slot * 17) + 'px;left:calc((100% - 18px) / 7 * ' + s.c + ' + ' + (3 * s.c + 3) + 'px);width:calc((100% - 18px) / 7 * ' + s.len + ' + ' + (3 * (s.len - 1) - 6) + 'px)">' + esc(s.e.title || "予定") + '</div>';
+  });
+  return out + '</div>';
 }
 var ICON_SRC = (function () { try { return document.querySelector('link[rel="icon"]').getAttribute("href"); } catch (e) { return ""; } })();
 function render() {
